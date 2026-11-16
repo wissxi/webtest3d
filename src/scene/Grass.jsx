@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { DoubleSide, Float32BufferAttribute, InstancedBufferAttribute, InstancedBufferGeometry, ShaderMaterial, UniformsLib, UniformsUtils } from 'three'
-import { snoise } from '../lib/glsl'
 import { G } from '../lib/uniforms'
 import { grassTrail, GRASS_BOUNDS } from '../lib/TrailMap'
 
@@ -10,6 +9,7 @@ uniform float uTime;
 uniform float uPulse;
 uniform sampler2D uTrail;
 uniform float uBounds;
+uniform sampler2D uNoise;
 attribute vec3 aOffset;
 attribute vec4 aParams; // yaw, height, rand, edge
 varying float vH;
@@ -17,12 +17,11 @@ varying float vRand;
 varying float vTrail;
 varying float vEdge;
 varying float vClump;
-${snoise}
 #include <fog_pars_vertex>
 void main(){
   vec3 p = position;
   float h = p.y;
-  p.x *= 0.05 * (0.7 + aParams.z * 0.6);
+  p.x *= 0.065 * (0.7 + aParams.z * 0.6);
   p.y *= aParams.y;
   float c = cos(aParams.x), s = sin(aParams.x);
   vec3 wp = aOffset + vec3(p.x * c, p.y, p.x * s);
@@ -30,13 +29,14 @@ void main(){
   vec2 tuv = aOffset.xz / (uBounds * 2.0) + 0.5;
   float tr = texture2D(uTrail, tuv).r;
   float e = 2.0 / 160.0;
-  float gx = texture2D(uTrail, tuv + vec2(e, 0.0)).r - texture2D(uTrail, tuv - vec2(e, 0.0)).r;
-  float gz = texture2D(uTrail, tuv + vec2(0.0, e)).r - texture2D(uTrail, tuv - vec2(0.0, e)).r;
+  float gx = texture2D(uTrail, tuv + vec2(e, 0.0)).r - tr;
+  float gz = texture2D(uTrail, tuv + vec2(0.0, e)).r - tr;
   vec2 away = -vec2(gx, gz);
   float al = length(away);
   away = al > 1e-4 ? away / al : vec2(0.0);
 
-  float gust = snoise(vec3(aOffset.xz * 0.22 + vec2(uTime * 0.16, uTime * 0.05), uTime * 0.08)) * 0.5 + 0.5;
+  vec3 nz = texture2D(uNoise, aOffset.xz * 0.035 + vec2(uTime * 0.012, uTime * 0.004)).rgb;
+  float gust = smoothstep(0.25, 0.75, nz.r);
   vec2 bend = normalize(vec2(1.0, 0.35)) * (gust * 0.5 + 0.08)
             + vec2(sin(uTime * 2.1 + aOffset.x * 1.7 + aOffset.z), cos(uTime * 1.7 + aOffset.z * 1.3)) * 0.07
             + away * tr * 1.6
@@ -50,7 +50,7 @@ void main(){
   vRand = aParams.z;
   vTrail = tr;
   vEdge = aParams.w;
-  vClump = snoise(vec3(aOffset.xz * 0.9, 1.0)) * 0.5 + 0.5;
+  vClump = nz.b;
   vec4 mvPosition = viewMatrix * modelMatrix * vec4(wp, 1.0);
   gl_Position = projectionMatrix * mvPosition;
   #include <fog_vertex>
@@ -82,7 +82,7 @@ export function Grass({ world }) {
   const { geometry, material } = useMemo(() => {
     const g = new InstancedBufferGeometry()
     const pos = []
-    const SEGS = 4
+    const SEGS = 3
     for (let i = 0; i < SEGS; i++) {
       const y = i / SEGS
       const w = 1 - Math.pow(y, 1.3)
@@ -114,6 +114,7 @@ export function Grass({ world }) {
     })
     m.uniforms.uTime = G.uTime
     m.uniforms.uPulse = G.uPulse
+    m.uniforms.uNoise = G.uNoise
     return { geometry: g, material: m }
   }, [world])
 

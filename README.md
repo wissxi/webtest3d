@@ -11,6 +11,12 @@ npm run build          # regular build → dist/
 npm run build:single   # single self-contained index.html → dist-single/
 ```
 
+## Deployment
+
+Live site: https://wissxi.github.io/webtest3d/
+
+`.github/workflows/deploy.yml` builds the project on every push and publishes `dist/` to the `gh-pages` branch. Pages has to be switched on once: **Settings → Pages → Build and deployment → Deploy from a branch → `gh-pages` / `(root)`**.
+
 ## What happens on screen
 
 | Interaction | Effect |

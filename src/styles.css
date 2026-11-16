@@ -1,5 +1,5 @@
 :root {
-  --bg: #010503;
+  --bg: #03110a;
   --ink: #e6fff0;
   --ink-dim: rgba(214, 255, 230, 0.62);
   --accent: #5dffa8;
@@ -385,9 +385,25 @@ body {
 .veil {
   position: fixed;
   inset: 0;
-  background: #000;
+  background: var(--bg);
   z-index: 30;
   pointer-events: none;
+  transition: opacity 1.6s ease, visibility 0s linear 1.6s;
+}
+
+.veil.gone {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.nogl {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 24px;
+  text-align: center;
+  color: var(--ink-dim);
 }
 
 .perf {

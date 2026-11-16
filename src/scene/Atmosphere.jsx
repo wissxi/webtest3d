@@ -1,15 +1,13 @@
 import { useMemo } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useThree } from '@react-three/fiber'
 import {
   AdditiveBlending,
   BackSide,
   BufferGeometry,
   CylinderGeometry,
-  DoubleSide,
   Float32BufferAttribute,
   ShaderMaterial,
 } from 'three'
-import { snoise } from '../lib/glsl'
 import { G } from '../lib/uniforms'
 import { rng } from '../lib/noise'
 
@@ -18,7 +16,7 @@ import { rng } from '../lib/noise'
 function Dome() {
   const material = useMemo(() => {
     const m = new ShaderMaterial({
-      uniforms: { uTime: G.uTime, uPulse: G.uPulse },
+      uniforms: { uTime: G.uTime, uPulse: G.uPulse, uNoise: G.uNoise },
       vertexShader: /* glsl */ `
         varying vec3 vDir;
         void main(){
@@ -29,20 +27,21 @@ function Dome() {
       fragmentShader: /* glsl */ `
         uniform float uTime;
         uniform float uPulse;
+        uniform sampler2D uNoise;
         varying vec3 vDir;
-        ${snoise}
         void main(){
           vec3 d = normalize(vDir);
-          vec3 top = vec3(0.0005, 0.002, 0.0015);
-          vec3 mid = vec3(0.004, 0.016, 0.01);
-          vec3 col = mix(mid, top, smoothstep(-0.1, 0.8, d.y));
-          float abyss = pow(max(-d.y, 0.0), 2.2);
-          float n = snoise(vec3(d.xz * 3.0, uTime * 0.05)) * 0.5 + 0.5;
-          col += vec3(0.01, 0.12, 0.06) * abyss * (0.7 + 0.5 * n) * (1.0 + uPulse);
-          col += vec3(0.04, 0.35, 0.18) * pow(max(-d.y, 0.0), 9.0);
-          // faint drifting haze near the horizon
-          float haze = snoise(vec3(d * 2.5 + vec3(uTime * 0.02, 0.0, 0.0))) * 0.5 + 0.5;
-          col += vec3(0.004, 0.02, 0.012) * haze * (1.0 - abs(d.y));
+          vec3 top = vec3(0.004, 0.022, 0.016);
+          vec3 mid = vec3(0.012, 0.058, 0.036);
+          vec3 col = mix(mid, top, smoothstep(-0.15, 0.85, d.y));
+          vec2 uv = vec2(atan(d.z, d.x) / 6.2832, d.y * 0.5);
+          float n = texture2D(uNoise, uv * vec2(3.0, 2.0) + vec2(uTime * 0.004, 0.0)).r;
+          float abyss = pow(max(-d.y, 0.0), 1.8);
+          col += vec3(0.02, 0.2, 0.1) * abyss * (0.6 + 0.7 * n) * (1.0 + uPulse);
+          col += vec3(0.06, 0.45, 0.24) * pow(max(-d.y, 0.0), 8.0);
+          // drifting haze bands around the horizon
+          float haze = texture2D(uNoise, uv * vec2(5.0, 6.0) + vec2(-uTime * 0.006, uTime * 0.002)).g;
+          col += vec3(0.012, 0.06, 0.035) * haze * (1.0 - abs(d.y));
           gl_FragColor = vec4(col, 1.0);
         }`,
       side: BackSide,
@@ -64,13 +63,13 @@ function LightShafts() {
   const shafts = useMemo(() => {
     const r = rng(5)
     const list = []
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2 + r() * 0.5
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + r() * 0.5
       const rad = 1.2 + r() * 4.6
-      const geo = new CylinderGeometry(0.9 + r() * 1.4, 0.12 + r() * 0.25, 22, 32, 1, true)
+      const geo = new CylinderGeometry(0.9 + r() * 1.4, 0.12 + r() * 0.25, 22, 20, 1, true)
       geo.translate(0, 11, 0)
       const mat = new ShaderMaterial({
-        uniforms: { uTime: G.uTime, uPulse: G.uPulse, uSeed: { value: r() * 10 }, uIntensity: { value: 0.16 + r() * 0.16 } },
+        uniforms: { uTime: G.uTime, uPulse: G.uPulse, uNoise: G.uNoise, uSeed: { value: r() * 10 }, uIntensity: { value: 0.3 + r() * 0.25 } },
         vertexShader: /* glsl */ `
           varying vec2 vUv;
           varying vec3 vN;
@@ -84,17 +83,17 @@ function LightShafts() {
           }`,
         fragmentShader: /* glsl */ `
           uniform float uTime, uPulse, uSeed, uIntensity;
+          uniform sampler2D uNoise;
           varying vec2 vUv;
           varying vec3 vN;
           varying vec3 vV;
-          ${snoise}
           void main(){
             float facing = abs(dot(normalize(vN), normalize(vV)));
             float soft = pow(facing, 3.0);
             float y = vUv.y;
             float fade = smoothstep(0.0, 0.18, y) * (1.0 - smoothstep(0.45, 0.95, y));
-            float n = snoise(vec3(vUv.x * 7.0 + uSeed, y * 4.0 - uTime * 0.35, uSeed)) * 0.5 + 0.5;
-            float n2 = snoise(vec3(vUv.x * 19.0, y * 9.0 - uTime * 0.6, uSeed * 2.0)) * 0.5 + 0.5;
+            float n = texture2D(uNoise, vec2(vUv.x * 2.0 + uSeed, y * 1.5 - uTime * 0.05)).r;
+            float n2 = texture2D(uNoise, vec2(vUv.x * 3.0 - uSeed, y * 3.0 - uTime * 0.09)).g;
             float a = soft * fade * (0.3 + 0.7 * n * n2) * uIntensity * (1.0 + uPulse * 2.0);
             a *= 0.75 + 0.25 * sin(uTime * 0.6 + uSeed * 3.0);
             vec3 col = mix(vec3(0.15, 1.0, 0.55), vec3(0.6, 1.0, 0.45), y);
@@ -103,7 +102,6 @@ function LightShafts() {
         transparent: true,
         depthWrite: false,
         blending: AdditiveBlending,
-        side: DoubleSide,
         fog: false,
       })
       list.push({
@@ -122,7 +120,7 @@ function LightShafts() {
 
 /* ---------------- particles: rising glints & bokeh from the depths ---------------- */
 
-function DepthParticles({ count = 900 }) {
+function DepthParticles({ count = 480 }) {
   const dpr = useThree((s) => s.viewport.dpr)
   const { geometry, material } = useMemo(() => {
     const r = rng(11)
@@ -133,7 +131,7 @@ function DepthParticles({ count = 900 }) {
       base.push(Math.cos(a) * rad, -22 + r() * 28, Math.sin(a) * rad - 1)
       const k = r() < 0.22 ? 1 : 0
       kind.push(k)
-      size.push(k ? 2 + r() * 4 : 1 + Math.pow(r(), 3) * 16)
+      size.push(k ? 2 + r() * 4 : 1 + Math.pow(r(), 3) * 10)
       speed.push(0.25 + r() * 0.7)
       seed.push(r())
     }
@@ -195,7 +193,7 @@ function DepthParticles({ count = 900 }) {
 
 /* ---------------- fireflies around the isle ---------------- */
 
-function Fireflies({ count = 160 }) {
+function Fireflies({ count = 120 }) {
   const dpr = useThree((s) => s.viewport.dpr)
   const { geometry, material } = useMemo(() => {
     const r = rng(23)
@@ -268,13 +266,12 @@ function AbyssGlow() {
   )
   return (
     <mesh position={[0.5, -19, -1]} rotation-x={-Math.PI / 2} material={material} raycast={() => null}>
-      <planeGeometry args={[34, 34]} />
+      <planeGeometry args={[26, 26]} />
     </mesh>
   )
 }
 
 export function Atmosphere() {
-  useFrame(() => {})
   return (
     <>
       <Dome />

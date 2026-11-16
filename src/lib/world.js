@@ -69,8 +69,7 @@ function orientCheck(geo, expect) {
   return geo
 }
 
-function buildIslandTop() {
-  const RINGS = 70
+function buildIslandTop(RINGS = 70, SEG = 192) {
   const pos = [], col = [], idx = []
   const c = new Color()
   const soil = new Color('#1a2a12'), moss = new Color('#2f5c22'), dark = new Color('#0e1a0b')
@@ -194,7 +193,7 @@ export function leafGeometry() {
   s.moveTo(0, 0)
   s.bezierCurveTo(0.42, 0.18, 0.38, 0.72, 0, 1)
   s.bezierCurveTo(-0.38, 0.72, -0.42, 0.18, 0, 0)
-  const g = new ShapeGeometry(s, 5)
+  const g = new ShapeGeometry(s, 3)
   // gentle fold along the midrib
   const p = g.attributes.position
   for (let i = 0; i < p.count; i++) p.setZ(i, Math.abs(p.getX(i)) * 0.35)
@@ -318,7 +317,7 @@ export function buildWorld() {
     const len = curve.getLength()
     const radius = opts.radius ?? 0.028
     vineParts.push(
-      taperedTube(curve, Math.max(16, Math.round(len * 14)), 5, (t) => radius * (1 - t * 0.6), {
+      taperedTube(curve, Math.max(12, Math.round(len * 10)), 4, (t) => radius * (1 - t * 0.6), {
         hangAt: (t) => t * len,
         phase,
         color: opts.color ?? vineGreen,
@@ -383,7 +382,7 @@ export function buildWorld() {
   const vines = mergeGeometries(vineParts)
 
   /* --- grass --- */
-  const GRASS = 26000
+  const GRASS = 16000
   const gOffset = new Float32Array(GRASS * 3)
   const gParams = new Float32Array(GRASS * 4) // yaw, height, rand, edge
   let gi = 0
@@ -420,6 +419,7 @@ export function buildWorld() {
 
   return {
     islandTop,
+    islandTopProxy: buildIslandTop(14, 40),
     islandBottom,
     wood,
     vines,

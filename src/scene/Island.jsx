@@ -86,7 +86,8 @@ export function Island({ world }) {
 
   return (
     <group>
-      <mesh ref={topRef} geometry={world.islandTop} material={mats.top} />
+      <mesh geometry={world.islandTop} material={mats.top} raycast={() => null} />
+      <mesh ref={topRef} geometry={world.islandTopProxy} visible={false} />
       <mesh geometry={world.islandBottom} material={mats.bottom} raycast={() => null} />
       <mesh geometry={world.wood} material={mats.wood} raycast={() => null} />
       <mesh geometry={world.vines} material={mats.vines} raycast={() => null} frustumCulled={false} />

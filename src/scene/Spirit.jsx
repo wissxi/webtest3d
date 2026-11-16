@@ -125,7 +125,7 @@ const maskMaterial = () =>
 /* ---------------- the mask geometry ---------------- */
 
 function maskGeometry() {
-  const g = new SphereGeometry(1, 120, 120, 0, Math.PI, 0.1 * Math.PI, 0.82 * Math.PI)
+  const g = new SphereGeometry(1, 72, 72, 0, Math.PI, 0.1 * Math.PI, 0.82 * Math.PI)
   const p = g.attributes.position
   const face = new Float32Array(p.count * 2)
   const ex = (v) => Math.exp(v)
@@ -280,11 +280,11 @@ export function Spirit({ world }) {
     s.background = null
     return s
   }, [])
-  const fbo = useMemo(() => new WebGLRenderTarget(4, 4, { type: HalfFloatType, samples: 2 }), [])
+  const fbo = useMemo(() => new WebGLRenderTarget(4, 4, { type: HalfFloatType }), [])
   const { size, gl, camera, viewport } = useThree()
 
   useEffect(() => {
-    const dpr = Math.min(viewport.dpr, 1.5)
+    const dpr = Math.min(viewport.dpr, 1) * 0.75
     fbo.setSize(Math.round(size.width * dpr), Math.round(size.height * dpr))
   }, [size, viewport.dpr, fbo])
 
@@ -294,6 +294,7 @@ export function Spirit({ world }) {
         uniforms: {
           uSecret: { value: fbo.texture },
           uMask: { value: null },
+          uNoise: G.uNoise,
           uTime: G.uTime,
           uAspect: { value: 1 },
           uGlobal: { value: 0 },
@@ -302,14 +303,14 @@ export function Spirit({ world }) {
         fragmentShader: /* glsl */ `
           uniform sampler2D uSecret;
           uniform sampler2D uMask;
+          uniform sampler2D uNoise;
           uniform float uTime, uAspect, uGlobal;
           varying vec2 vUv;
-          ${snoise}
           void main(){
             vec2 uv = vUv;
             vec2 p = uv * vec2(uAspect, 1.0);
-            float n = snoise(vec3(p * 3.2, uTime * 0.35));
-            float n2 = snoise(vec3(p * 8.0, uTime * 0.6 + 4.0));
+            float n = texture2D(uNoise, p * 0.4 + vec2(uTime * 0.03, -uTime * 0.02)).r * 2.0 - 1.0;
+            float n2 = texture2D(uNoise, p * 0.9 - vec2(uTime * 0.05, uTime * 0.04)).g * 2.0 - 1.0;
             float m = texture2D(uMask, uv + vec2(n, n2) * 0.012).r;
             float gd = length((uv - 0.5) * vec2(uAspect, 1.0)) + n * 0.04;
             float g = uGlobal > 0.001 ? smoothstep(uGlobal * 1.25, uGlobal * 1.25 - 0.2, gd) : 0.0;

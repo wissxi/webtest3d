@@ -1,13 +1,23 @@
-import { Suspense, useEffect, useRef } from 'react'
+import { Suspense, useCallback, useEffect, useRef } from 'react'
 import gsap from 'gsap'
 import { Experience } from './scene/Experience'
 import { Overlay } from './ui/Overlay'
 import { Cursor } from './ui/Cursor'
 import { store } from './lib/store'
 
+gsap.ticker.lagSmoothing(0)
+
 export default function App() {
   const debug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug')
   const veil = useRef()
+
+  // Runs once the first frames are on screen. The veil fades with a CSS transition and
+  // the intro uses real time, so a slow first frame can't leave the page black.
+  const onReady = useCallback(() => {
+    veil.current?.classList.add('gone')
+    if (store.intro < 0.9) gsap.to(store, { intro: 1, duration: 3.4, ease: 'power2.inOut' })
+    else store.intro = 1
+  }, [])
 
   useEffect(() => {
     const onScroll = () => {
@@ -21,21 +31,16 @@ export default function App() {
     const q = new URLSearchParams(window.location.search)
     if (q.has('nointro')) store.intro = 0.999
     if (q.has('spirit')) store.forceReveal = 1
-    const tl = gsap.timeline({ delay: 0.25 })
-    tl.to(veil.current, { opacity: 0, duration: 1.6, ease: 'power2.inOut' })
-      .to(store, { intro: 1, duration: store.intro > 0.9 ? 0.1 : 4.2, ease: 'power2.inOut' }, 0)
-      .add(() => veil.current && (veil.current.style.display = 'none'))
     return () => {
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
-      tl.kill()
     }
   }, [])
 
   return (
     <>
       <Suspense fallback={null}>
-        <Experience debug={debug} />
+        <Experience debug={debug} onReady={onReady} />
       </Suspense>
       <Overlay />
       <Cursor />

@@ -8,3 +8,6 @@ export const G = {
   uRayActive: { value: 0 },
   uPulse: { value: 0 },
 }
+
+import { getNoiseTexture } from './noiseTexture'
+G.uNoise = { value: getNoiseTexture() }
