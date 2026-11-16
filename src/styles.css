@@ -20,6 +20,10 @@ html {
 
 html,
 body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
   margin: 0;
   background: var(--bg);
   color: var(--ink);
@@ -36,8 +40,13 @@ body {
 }
 
 ::selection {
-  background: var(--accent);
-  color: var(--bg);
+  background: transparent;
+}
+
+img,
+svg,
+a {
+  -webkit-user-drag: none;
 }
 
 .webgl {
@@ -358,18 +367,8 @@ body {
 
 .cursor-ring {
   border-radius: 50%;
-  border: 1px solid rgba(140, 255, 200, 0.28);
-  display: grid;
-  place-items: end center;
-}
-
-.cursor-ring span {
-  transform: translateY(18px);
-  font-size: 9px;
-  letter-spacing: 0.35em;
-  text-transform: uppercase;
-  color: var(--accent);
-  opacity: 0.8;
+  border: 1px solid rgba(190, 255, 210, 0.55);
+  mix-blend-mode: screen;
 }
 
 .cursor-dot {

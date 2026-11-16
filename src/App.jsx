@@ -30,7 +30,7 @@ export default function App() {
 
     const q = new URLSearchParams(window.location.search)
     if (q.has('nointro')) store.intro = 0.999
-    if (q.has('spirit')) store.forceReveal = 1
+    if (q.has('alive')) store.forceReveal = 1
     return () => {
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)

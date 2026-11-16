@@ -64,9 +64,9 @@ export function Island({ world }) {
       bottom: new MeshStandardMaterial({ vertexColors: true, roughness: 0.92, flatShading: true }),
       wood: new MeshStandardMaterial({ vertexColors: true, roughness: 0.85 }),
       vines: swayStandard({ vertexColors: true, roughness: 0.8 }),
-      leaves: swayStandard({ side: DoubleSide, roughness: 0.62, emissive: new Color('#0b2a0c'), emissiveIntensity: 0.6 }),
-      vineLeaves: swayStandard({ side: DoubleSide, roughness: 0.7, emissive: new Color('#082207') }),
-      bulbs: swayBasic({ color: new Color(0.55, 2.6, 1.3), toneMapped: false }),
+      leaves: swayStandard({ side: DoubleSide, roughness: 0.62, emissive: new Color('#0b2a0c'), emissiveIntensity: 0.6 }, true),
+      vineLeaves: swayStandard({ side: DoubleSide, roughness: 0.7, emissive: new Color('#082207') }, true),
+      bulbs: swayBasic({ color: new Color(0.55, 2.6, 1.3), toneMapped: false }, true),
     }
   }, [])
 

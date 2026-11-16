@@ -10,7 +10,8 @@ import { Island } from './Island'
 import { Grass } from './Grass'
 import { Butterflies } from './Butterflies'
 import { Atmosphere } from './Atmosphere'
-import { Spirit } from './Spirit'
+import { Flora } from './Flora'
+import { LifeEffect } from './LifeEffect'
 import { Interaction } from './Interaction'
 import { CameraRig } from './CameraRig'
 import { PerfProbe } from './PerfProbe'
@@ -22,6 +23,7 @@ function Isle({ world }) {
     <group ref={ref}>
       <Island world={world} />
       <Grass world={world} />
+      <Flora />
     </group>
   )
 }
@@ -58,6 +60,7 @@ export function Experience({ debug, onReady }) {
   const world = useMemo(() => buildWorld(), [])
   const [dpr, setDpr] = useState(Math.min(MAX_DPR, 1))
   const caOffset = useMemo(() => new Vector2(0.0007, 0.0005), [])
+  const life = useMemo(() => new LifeEffect(), [])
   return (
     <Canvas
       className="webgl"
@@ -77,7 +80,7 @@ export function Experience({ debug, onReady }) {
       />
       <Ready onReady={onReady} />
       <color attach="background" args={['#04170e']} />
-      <fogExp2 attach="fog" args={['#072519', 0.028]} />
+      <fogExp2 attach="fog" args={['#0b1813', 0.028]} />
 
       <CameraRig />
       <Interaction />
@@ -92,11 +95,11 @@ export function Experience({ debug, onReady }) {
       <Atmosphere />
       <Isle world={world} />
       <Butterflies />
-      <Spirit world={world} />
 
       <EffectComposer multisampling={0}>
         <Bloom mipmapBlur intensity={1.15} luminanceThreshold={0.4} luminanceSmoothing={0.3} radius={0.72} levels={6} />
         <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+        <primitive object={life} />
         <ChromaticAberration offset={caOffset} radialModulation modulationOffset={0.35} />
         <Vignette offset={0.3} darkness={0.6} />
         <Noise premultiply blendFunction={BlendFunction.SCREEN} opacity={0.35} />

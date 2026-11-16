@@ -44,3 +44,13 @@ float snoise(vec3 v){
   return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
 }
 `
+
+/** Screen-space "life" mask: 1 where the visitor has brought the isle back to life. */
+export const lifeChunk = /* glsl */ `
+uniform sampler2D uLife;
+float lifeAtUv(vec2 uv){ return texture2D(uLife, clamp(uv, vec2(0.001), vec2(0.999))).r; }
+float lifeAtClip(vec4 c){
+  if (c.w <= 0.0) return 0.0;
+  return smoothstep(0.3, 0.62, lifeAtUv(c.xy / c.w * 0.5 + 0.5));
+}
+`

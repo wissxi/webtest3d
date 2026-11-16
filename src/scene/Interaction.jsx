@@ -10,7 +10,7 @@ import { grassTrail, lensTrail, GRASS_BOUNDS } from '../lib/TrailMap'
 export function Interaction() {
   const { gl, camera, size } = useThree()
   const tmp = useMemo(
-    () => ({ ray: new Raycaster(), local: new Vector3(), groundUv: new Vector2(), prevGroundUv: new Vector2(), ghost: new Vector2(), prevGhost: new Vector2(0.5, 0.5) }),
+    () => ({ ray: new Raycaster(), local: new Vector3(), groundUv: new Vector2(), prevGroundUv: new Vector2(), hitWorld: new Vector3(), lureTarget: new Vector3(), ghost: new Vector2(), prevGhost: new Vector2(0.5, 0.5) }),
     [],
   )
 
@@ -60,6 +60,7 @@ export function Interaction() {
     if (store.pointerActive && store.groundMesh) {
       const hits = tmp.ray.intersectObject(store.groundMesh, false)
       if (hits.length) {
+        tmp.hitWorld.copy(hits[0].point)
         tmp.local.copy(hits[0].point)
         store.groundMesh.worldToLocal(tmp.local)
         tmp.groundUv.set(tmp.local.x / (GRASS_BOUNDS * 2) + 0.5, tmp.local.z / (GRASS_BOUNDS * 2) + 0.5)
@@ -67,6 +68,15 @@ export function Interaction() {
         hit = true
       }
     }
+    // the point the butterflies gather around
+    if (hit) {
+      tmp.lureTarget.copy(tmp.hitWorld).y += 0.75
+    } else {
+      tmp.ray.ray.at(camera.position.length() * 0.82, tmp.lureTarget)
+    }
+    if (store.pointerActive) store.cursorWorld.lerp(tmp.lureTarget, 1 - Math.exp(-dt * 5))
+    store.lure += ((store.pointerActive ? 1 : 0) - store.lure) * (1 - Math.exp(-dt * 2))
+
     const moved = tmp.groundUv.distanceTo(tmp.prevGroundUv)
     const gu = grassTrail.uniforms
     gu.uA.value.copy(tmp.prevGroundUv)
@@ -98,11 +108,14 @@ export function Interaction() {
     lu.uAspect.value = aspect
     lu.uRadius.value = store.lensRadius * (usingGhost ? 0.85 : 1) * (1 + store.pulse * 0.15)
     lu.uStrength.value = store.pointerActive ? 1 : usingGhost ? store.ghost : 0
-    lu.uDecay.value = Math.pow(0.9, dt * 60)
+    lu.uDecay.value = Math.pow(0.982, dt * 60)
     lu.uExtraPos.value.copy(store.pointerUv)
-    lu.uExtraRadius.value = store.burst > 0 ? store.burst * 0.75 : 0
+    lu.uExtraRadius.value = store.burst > 0 ? store.burst * 0.95 : 0
     lu.uExtraStrength.value = store.burst > 0 ? 1 - store.burst * store.burst : 0
+    lu.uGlobal.value = store.revealGlobal
     lensTrail.update(gl)
+    G.uLife.value = lensTrail.texture
+    G.uAspect.value = aspect
     store.prevPointerUv.copy(store.pointerUv)
     tmp.prevGhost.copy(tmp.ghost)
   }, -1)

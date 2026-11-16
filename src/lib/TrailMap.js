@@ -31,12 +31,13 @@ export class TrailMap {
         uExtraPos: { value: new Vector2(0.5, 0.5) },
         uExtraRadius: { value: 0 },
         uExtraStrength: { value: 0 },
+        uGlobal: { value: 0 },
       },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
       fragmentShader: /* glsl */ `
         uniform sampler2D uPrev;
         uniform vec2 uA, uB, uExtraPos;
-        uniform float uRadius, uStrength, uDecay, uAspect, uExtraRadius, uExtraStrength;
+        uniform float uRadius, uStrength, uDecay, uAspect, uExtraRadius, uExtraStrength, uGlobal;
         varying vec2 vUv;
         float seg(vec2 p, vec2 a, vec2 b){
           vec2 pa = p - a, ba = b - a;
@@ -50,6 +51,7 @@ export class TrailMap {
           float brush = smoothstep(uRadius, uRadius * 0.35, d) * uStrength;
           float extra = smoothstep(uExtraRadius, uExtraRadius * 0.6, length((vUv - uExtraPos) * asp)) * uExtraStrength;
           float v = ${additive ? 'min(prev + brush * 0.35 + extra, 1.0)' : 'max(max(prev, brush), extra)'};
+          if (uGlobal > 0.001) v = max(v, smoothstep(uGlobal * 1.3, uGlobal * 1.3 - 0.25, length((vUv - 0.5) * asp)));
           gl_FragColor = vec4(v, 0.0, 0.0, 1.0);
         }`,
       depthTest: false,

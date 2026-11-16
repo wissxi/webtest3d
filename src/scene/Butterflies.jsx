@@ -1,7 +1,6 @@
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import {
-  AdditiveBlending,
   BufferGeometry,
   Color,
   DoubleSide,
@@ -14,6 +13,7 @@ import {
   Vector3,
 } from 'three'
 import { G } from '../lib/uniforms'
+import { lifeChunk } from '../lib/glsl'
 import { store } from '../lib/store'
 import { rng } from '../lib/noise'
 
@@ -55,6 +55,7 @@ function butterflyGeometry() {
 
 const vertexShader = /* glsl */ `
 uniform float uTime;
+${lifeChunk}
 attribute float aSide;
 attribute float aPhase;
 attribute float aFreq;
@@ -73,6 +74,10 @@ void main(){
     p.x = aSide * x * cos(bendA);
     p.y = x * sin(bendA);
   }
+  // butterflies only exist where the isle is alive
+  vec4 origin = modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+  float lf = lifeAtClip(projectionMatrix * viewMatrix * origin);
+  p *= smoothstep(0.05, 0.9, lf);
   vUv = uv;
   vSide = aSide;
   vColor = aColor;
@@ -131,51 +136,20 @@ void main(){
 }
 `
 
-// The spirit version draws only glowing contours.
-const spiritFragment = /* glsl */ `
-uniform float uTime;
-varying vec2 vUv;
-varying float vSide;
-varying vec3 vColor;
-varying float vPhase;
-float ell(vec2 p, vec2 c, vec2 r, float rot){
-  p -= c;
-  float cs = cos(rot), sn = sin(rot);
-  p = vec2(cs * p.x - sn * p.y, sn * p.x + cs * p.y);
-  return length(p / r);
-}
-void main(){
-  if (vSide == 0.0) discard;
-  vec2 p = vUv;
-  float d = min(ell(p, vec2(0.5, 0.36), vec2(0.55, 0.36), -0.55), ell(p, vec2(0.36, -0.4), vec2(0.4, 0.42), 0.35));
-  if (d > 1.0) discard;
-  float rim = smoothstep(0.84, 0.96, d);
-  float ang = atan(p.y, p.x);
-  float veins = smoothstep(0.93, 1.0, abs(sin(ang * 7.0)));
-  vec3 c = vec3(0.3, 1.3, 1.1) * (rim * 0.9 + veins * 0.3 + 0.03);
-  gl_FragColor = vec4(c, 1.0);
-}
-`
-
 const PALETTE = ['#1fe08a', '#5dffb0', '#9cff57', '#22d3c5', '#c4ff6a', '#14b86a'].map((c) => new Color(c))
 
-function makeMaterial(spirit) {
+function makeMaterial() {
   const m = new ShaderMaterial({
     uniforms: UniformsUtils.merge([UniformsLib.fog, {}]),
     vertexShader,
-    fragmentShader: spirit ? spiritFragment : fragmentShader,
+    fragmentShader,
     side: DoubleSide,
-    fog: !spirit,
-    transparent: spirit,
-    depthWrite: !spirit,
+    fog: true,
   })
-  if (spirit) m.blending = AdditiveBlending
   m.uniforms.uTime = G.uTime
+  m.uniforms.uLife = G.uLife
   return m
 }
-
-/** Simulated flock. The spirit world renders the same instances with a different shader. */
-export const butterflyState = { mesh: null }
 
 let shared = null
 function getShared() {
@@ -200,6 +174,8 @@ function getShared() {
       w: (0.12 + r() * 0.2) * (r() < 0.5 ? -1 : 1),
       ph: r() * 6.28,
       scale: 0.19 + r() * 0.1,
+      attract: i % 4 === 3 ? 0 : 0.55 + r() * 0.45,
+      orbit: 0.45 + r() * 1.1,
     })
   }
   g.setAttribute('aPhase', new InstancedBufferAttribute(phase, 1))
@@ -212,11 +188,7 @@ function getShared() {
 export function Butterflies() {
   const ref = useRef()
   const { geometry, sim } = getShared()
-  const material = useMemo(() => makeMaterial(false), [])
-
-  useLayoutEffect(() => {
-    butterflyState.mesh = ref.current
-  }, [])
+  const material = useMemo(() => makeMaterial(), [])
 
   const tmp = useMemo(() => ({ o: new Object3D(), target: new Vector3(), acc: new Vector3(), d: new Vector3(), away: new Vector3() }), [])
 
@@ -224,7 +196,7 @@ export function Butterflies() {
     const dt = Math.min(delta, 1 / 30)
     const t = state.clock.elapsedTime
     const { o, target, acc, d, away } = tmp
-    const ro = G.uRayO.value, rd = G.uRayD.value, rayOn = G.uRayActive.value
+    const lure = store.cursorWorld, lureOn = store.lure
     for (let i = 0; i < sim.length; i++) {
       const b = sim[i]
       const th = t * b.w + b.ph
@@ -233,22 +205,24 @@ export function Butterflies() {
         b.H + Math.sin(t * 0.6 + b.ph) * 0.55,
         Math.sin(th) * b.R + Math.cos(t * 0.27 + b.ph) * 0.6,
       )
+      // drawn to the living spot under the cursor, circling it
+      if (lureOn > 0.01 && b.attract > 0) {
+        const k = b.attract * lureOn
+        const th2 = t * (0.9 + b.attract) + b.ph * 3
+        d.set(
+          lure.x + Math.cos(th2) * b.orbit,
+          lure.y + Math.sin(t * 1.3 + b.ph) * 0.35 + 0.15,
+          lure.z + Math.sin(th2) * b.orbit,
+        )
+        target.lerp(d, k)
+      }
       acc.subVectors(target, b.pos).multiplyScalar(0.9)
-      if (acc.length() > 1.8) acc.setLength(1.8)
+      if (acc.length() > 2.4) acc.setLength(2.4)
       acc.sub(b.vel).multiplyScalar(1.6)
       // erratic flutter
       acc.x += Math.sin(t * 5.3 + b.ph * 7) * 1.6
       acc.y += Math.sin(t * 4.1 + b.ph * 3) * 2.2
       acc.z += Math.cos(t * 4.7 + b.ph * 5) * 1.6
-      // flee the cursor ray
-      if (rayOn > 0.05) {
-        d.subVectors(b.pos, ro)
-        const along = Math.max(d.dot(rd), 0)
-        away.copy(ro).addScaledVector(rd, along)
-        away.subVectors(b.pos, away)
-        const dist = away.length()
-        if (dist < 1.4) acc.addScaledVector(away.normalize(), (1.4 - dist) * 22 * rayOn)
-      }
       // click: everyone scatters outward
       if (store.burst > 0) {
         away.copy(b.pos).setY(0).normalize()
@@ -272,16 +246,4 @@ export function Butterflies() {
   })
 
   return <instancedMesh ref={ref} args={[geometry, material, BUTTERFLY_COUNT]} frustumCulled={false} raycast={() => null} />
-}
-
-export function SpiritButterflies() {
-  const ref = useRef()
-  const material = useMemo(() => makeMaterial(true), [])
-  useFrame(() => {
-    const m = butterflyState.mesh
-    if (m && ref.current && ref.current.instanceMatrix !== m.instanceMatrix) {
-      ref.current.instanceMatrix = m.instanceMatrix
-    }
-  })
-  return <instancedMesh ref={ref} args={[getShared().geometry, material, BUTTERFLY_COUNT]} frustumCulled={false} raycast={() => null} />
 }

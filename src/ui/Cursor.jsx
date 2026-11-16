@@ -21,7 +21,7 @@ export function Cursor() {
     const loop = () => {
       rx += (x - rx) * 0.16
       ry += (y - ry) * 0.16
-      const d = store.lensRadius * 2 * innerHeight * (1 + store.pulse * 0.15)
+      const d = 34 * (1 + store.pulse * 0.6)
       if (ring.current) {
         ring.current.style.width = ring.current.style.height = d + 'px'
         ring.current.style.transform = `translate3d(${rx - d / 2}px, ${ry - d / 2}px, 0)`
@@ -42,9 +42,7 @@ export function Cursor() {
   }, [])
   return (
     <>
-      <div className="cursor-ring" ref={ring} aria-hidden="true">
-        <span>дух</span>
-      </div>
+      <div className="cursor-ring" ref={ring} aria-hidden="true" />
       <div className="cursor-dot" ref={dot} aria-hidden="true" />
     </>
   )

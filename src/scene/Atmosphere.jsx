@@ -9,6 +9,7 @@ import {
   ShaderMaterial,
 } from 'three'
 import { G } from '../lib/uniforms'
+import { lifeChunk } from '../lib/glsl'
 import { rng } from '../lib/noise'
 
 /* ---------------- sky / abyss dome ---------------- */
@@ -42,6 +43,8 @@ function Dome() {
           // drifting haze bands around the horizon
           float haze = texture2D(uNoise, uv * vec2(5.0, 6.0) + vec2(-uTime * 0.006, uTime * 0.002)).g;
           col += vec3(0.012, 0.06, 0.035) * haze * (1.0 - abs(d.y));
+          // keep the empty sky muted, so life shows on things rather than as a green disc
+          col = mix(vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))), col, 0.18);
           gl_FragColor = vec4(col, 1.0);
         }`,
       side: BackSide,
@@ -142,9 +145,10 @@ function DepthParticles({ count = 480 }) {
     g.setAttribute('aSeed', new Float32BufferAttribute(seed, 1))
     g.setAttribute('aKind', new Float32BufferAttribute(kind, 1))
     const m = new ShaderMaterial({
-      uniforms: { uTime: G.uTime, uPulse: G.uPulse, uPR: { value: 1 } },
+      uniforms: { uTime: G.uTime, uPulse: G.uPulse, uPR: { value: 1 }, uLife: G.uLife },
       vertexShader: /* glsl */ `
         uniform float uTime, uPR, uPulse;
+        ${lifeChunk}
         attribute float aSize, aSpeed, aSeed, aKind;
         varying float vAlpha;
         varying float vKind;
@@ -160,6 +164,7 @@ function DepthParticles({ count = 480 }) {
           gl_PointSize = aSize * uPR * (12.0 / -mv.z) * (aKind > 0.5 ? (0.6 + tw * 0.8) : 1.0);
           vAlpha = smoothstep(6.0, 1.0, p.y) * smoothstep(-22.0, -18.0, p.y) * tw;
           vAlpha *= smoothstep(0.4, 2.5, -mv.z);
+          vAlpha *= mix(0.3, 1.0, lifeAtClip(gl_Position));
           vKind = aKind;
           vSeed = aSeed;
         }`,
@@ -193,7 +198,7 @@ function DepthParticles({ count = 480 }) {
 
 /* ---------------- fireflies around the isle ---------------- */
 
-function Fireflies({ count = 120 }) {
+function Fireflies({ count = 220 }) {
   const dpr = useThree((s) => s.viewport.dpr)
   const { geometry, material } = useMemo(() => {
     const r = rng(23)
@@ -208,9 +213,10 @@ function Fireflies({ count = 120 }) {
     g.setAttribute('position', new Float32BufferAttribute(base, 3))
     g.setAttribute('aSeed', new Float32BufferAttribute(seed, 1))
     const m = new ShaderMaterial({
-      uniforms: { uTime: G.uTime, uPR: { value: 1 }, uPulse: G.uPulse },
+      uniforms: { uTime: G.uTime, uPR: { value: 1 }, uPulse: G.uPulse, uLife: G.uLife },
       vertexShader: /* glsl */ `
         uniform float uTime, uPR, uPulse;
+        ${lifeChunk}
         attribute float aSeed;
         varying float vA;
         void main(){
@@ -220,7 +226,7 @@ function Fireflies({ count = 120 }) {
           vec4 mv = modelViewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mv;
           float blink = smoothstep(0.2, 1.0, sin(uTime * (0.7 + aSeed) + s) * 0.5 + 0.5);
-          vA = blink * (1.0 + uPulse * 2.0);
+          vA = blink * (1.0 + uPulse * 2.0) * lifeAtClip(gl_Position);
           gl_PointSize = (3.0 + aSeed * 4.0) * uPR * (8.0 / -mv.z);
         }`,
       fragmentShader: /* glsl */ `

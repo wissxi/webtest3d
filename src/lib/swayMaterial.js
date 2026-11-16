@@ -1,5 +1,6 @@
 import { MeshBasicMaterial, MeshStandardMaterial } from 'three'
 import { G } from './uniforms'
+import { lifeChunk } from './glsl'
 
 const header = /* glsl */ `
 uniform float uTime;
@@ -9,6 +10,7 @@ uniform float uRayActive;
 uniform float uPulse;
 attribute float aHang;
 attribute float aPhase;
+${lifeChunk}
 vec3 swayOffset(vec3 wp, float h, float ph){
   float a = h * h * 0.022 + h * 0.012;
   vec3 o = vec3(
@@ -28,6 +30,13 @@ vec3 swayOffset(vec3 wp, float h, float ph){
 `
 
 const project = /* glsl */ `
+#ifdef GROW
+  // leaves, bulbs: wither to nothing in the dead world, pop back where life returns
+  vec4 growOrigin = modelMatrix * (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0));
+  float lf = lifeAtClip(projectionMatrix * viewMatrix * growOrigin);
+  lf = smoothstep(0.0, 1.0, lf);
+  transformed *= lf * (1.0 + 0.35 * sin(lf * 3.14159));
+#endif
 vec4 mvPosition = vec4( transformed, 1.0 );
 #ifdef USE_INSTANCING
   mvPosition = instanceMatrix * mvPosition;
@@ -38,16 +47,17 @@ mvPosition = viewMatrix * mvPosition;
 gl_Position = projectionMatrix * mvPosition;
 `
 
-function inject(material) {
+function inject(material, grow) {
+  if (grow) material.defines = { ...(material.defines || {}), GROW: '' }
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, G)
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\n' + header)
       .replace('#include <project_vertex>', project)
   }
-  material.customProgramCacheKey = () => 'sway'
+  material.customProgramCacheKey = () => (grow ? 'sway-grow' : 'sway')
   return material
 }
 
-export const swayStandard = (params) => inject(new MeshStandardMaterial(params))
-export const swayBasic = (params) => inject(new MeshBasicMaterial(params))
+export const swayStandard = (params, grow = false) => inject(new MeshStandardMaterial(params), grow)
+export const swayBasic = (params, grow = false) => inject(new MeshBasicMaterial(params), grow)

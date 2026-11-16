@@ -11,3 +11,5 @@ export const G = {
 
 import { getNoiseTexture } from './noiseTexture'
 G.uNoise = { value: getNoiseTexture() }
+G.uLife = { value: null }
+G.uAspect = { value: 1 }

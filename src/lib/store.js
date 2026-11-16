@@ -19,12 +19,15 @@ export const store = {
   pulse: 0, // click "breath", animated by gsap
   burst: 0, // click reveal burst
   intro: 0, // 0 → 1 intro rise
-  lensRadius: 0.13, // fraction of viewport height
-  revealGlobal: 0, // finale: whole screen in spirit vision
+  lensRadius: 0.25, // fraction of viewport height
+  cursorWorld: new Vector3(0, 1, 0),
+  lure: 0,
+  ghost: 0,
+  revealGlobal: 0, // finale: the whole isle comes back to life
   time: 0,
 }
 
-/** The isle breathes very slowly; shared by the real and the spirit world. */
+/** The isle breathes very slowly; shared by everything that sits on it. */
 export function applyIsleMotion(obj, t) {
   obj.position.y = Math.sin(t * 0.35) * 0.08
   obj.rotation.y = Math.sin(t * 0.07) * 0.05
